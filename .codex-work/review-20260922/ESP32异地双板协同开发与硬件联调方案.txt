@@ -1,0 +1,301 @@
+ESP32异地双板协同开发
+与硬件联调方案
+经典ESP32传感控制节点 + ESP32-S3-CAM视觉节点
+适用于A、B同学分处两地的并行开发
+项目：基于ESP32的大学物理实验多模态智能助手
+B同学：申奥
+版本：V1.0｜2026年7月
+
+使用说明
+本方案解决两名开发者分处两地、每人只有自己负责的开发板时，如何完成硬件开发、软件联调和最终验收。核心做法是把系统拆成可独立测试的网络节点，用统一协议、电脑模拟替身和可追踪日志隔离硬件依赖。
+
+
+1. 异地开发总体架构
+1.1 推荐数据流
+B板(ADS1115/传感器) ─MQTT→ 公网Broker ←MQTT─ A板(S3-CAM)
+        ↑                                  │
+        └── vision/result ─ YOLO电脑 ←HTTPS─ JPEG图片
+B板周期发布传感数据和在线状态。
+电脑端发布带request_id的拍照命令。
+A板拍照后通过HTTPS上传JPEG并上报image_id。
+YOLO电脑发布带相同request_id的vision/result。
+B板结合视觉结果和本地阈值执行蜂鸣器、LED或显示提示。
+1.2 异地可行性的技术原因
+
+2. 网络与服务器部署
+2.1 推荐方案：公网MQTT + 公网HTTPS图片中转
+A、B两块ESP32都主动连接公网服务，不需要家庭路由器端口映射。图片接收接口部署在互联网可访问的位置，YOLO电脑从服务器获取待处理图片。这样可以避开校园网设备隔离和家庭宽带NAT。
+
+2.2 其他方案的边界
+
+2.3 首次联网前统一参数
+
+3. 分工与交付边界
+
+
+4. 冻结的MQTT与HTTP接口
+4.1 MQTT主题
+
+4.2 拍照命令示例
+// physlab/camera01/cmd
+{
+  "schema":"physlab.camera.cmd.v1",
+  "request_id":"req-20260713-0001",
+  "action":"capture",
+  "resolution":"VGA",
+  "jpeg_quality":15,
+  "timeout_ms":15000
+}
+4.3 A板上传回执示例
+// physlab/camera01/status
+{
+  "schema":"physlab.camera.status.v1",
+  "device_id":"camera01",
+  "request_id":"req-20260713-0001",
+  "state":"uploaded",
+  "image_id":"img-20260713-0001",
+  "bytes":86420,
+  "http_status":201,
+  "heap":182300,
+  "error":null
+}
+4.4 YOLO结果示例
+// physlab/vision/result
+{
+  "schema":"physlab.vision.v1",
+  "request_id":"req-20260713-0001",
+  "image_id":"img-20260713-0001",
+  "experiment":"rlc_series",
+  "objects":[{"name":"resistor","confidence":0.92}],
+  "warning":"inductor_missing",
+  "message":"未检测到电感，请检查器材和接线",
+  "processing_ms":380
+}
+4.5 HTTP图片上传约定
+
+5. 电脑模拟替身：手边没有对方硬件时怎么做
+5.1 B同学模拟A板
+电脑连接相同Broker并观察physlab/camera01/cmd。
+准备固定实验图片，或直接跳过图片阶段。
+电脑向physlab/vision/result发布测试JSON，request_id与拍照命令一致。
+验证B板是否在规定时间内蜂鸣、亮灯、显示提示并记录日志。
+
+5.2 A同学模拟B板
+电脑向physlab/camera01/cmd发布固定拍照命令。
+A板打印request_id、摄像头状态和剩余堆内存。
+A板上传JPEG，电脑验证服务器收到相同request_id。
+连续执行20次，统计成功率、平均图片大小、上传时延和最低堆内存。
+
+6. A同学异地开发流程
+
+6.1 A板推荐起步参数
+
+7. B同学（申奥）异地开发流程
+
+
+8. 每日远程协作制度
+8.1 每日15分钟同步
+
+8.2 每次提交的最小交付包
+
+9. 远程硬件故障取证
+异地最浪费时间的不是硬件坏，而是证据不完整。任何硬件问题必须按下表提交，不能只说“就是不行”或“偶尔重启”。
+
+9.1 A板日志必须包含
+芯片型号、Flash、PSRAM字节数及psramFound结果。
+camera_init返回码、分辨率、jpeg_quality、fb_count、XCLK。
+request_id、帧长度、拍照耗时、HTTP状态码和重试次数。
+最低堆内存、Wi-Fi RSSI、复位原因。
+9.2 B板日志必须包含
+ADS1115地址、PGA量程、数据率、原始码和换算电压。
+MQTT连接/重连原因、订阅主题、完整request_id。
+warning进入状态机后的分支及蜂鸣器/LED状态。
+视觉掉线时本地采样与保护是否继续运行。
+10. 常见问题的责任定位
+
+11. Git与版本管理
+project/
+  firmware/sensor_node/   # B板
+  firmware/camera_node/   # A板
+  edge/image_receiver/    # 图片服务
+  edge/vision_service/    # YOLO
+  tools/mock_camera/      # A板模拟器
+  tools/mock_vision/      # 视觉结果模拟器
+  protocol/               # 主题、Schema、错误码
+  docs/test_records/      # 联调记录
+main只合并可构建、基本运行且协议兼容的版本。
+A、B分别使用camera/*与sensor/*分支；协议文件由B维护、双方评审。
+主题、字段、错误码变化必须升级schema或保持向后兼容。
+Wi-Fi密码、Broker密码、Token和私钥不得提交。
+发布固件附版本号、提交号、构建环境和已知问题。
+12. 安全与隐私
+
+13. 十个工作日实施计划
+
+14. 最终集中演示
+异地能完成绝大部分开发，但正式演示前建议将两块板和YOLO电脑集中一次。若无法提前见面，可将其中一块板快递给负责演示的人，或在答辩前至少预留半天。
+
+15. 验收清单
+□ A板输出Flash/PSRAM、摄像头初始化和首帧信息。
+□ A板响应远程拍照命令并上传JPEG。
+□ A板断网后可重连，失败不会无限阻塞。
+□ B板稳定读取ADS1115并发布sensor01/data。
+□ B板接收模拟vision/result并执行报警。
+□ 两板从不同网络连接同一个Broker。
+□ request_id贯通命令、图片、YOLO结果和报警。
+□ A板离线时B板本地采样和保护继续。
+□ 连续20轮异地端到端测试达到约定成功率。
+□ 仓库不含Wi-Fi密码、Broker密码或Token。
+附录A：远程故障报告模板
+
+附录B：异地联调记录模板
+
+核心结论 | 两块板不需要用杜邦线连接，也不需要处于同一局域网。A、B两板分别主动连接同一个公网MQTT服务；图片通过HTTP/HTTPS上传。双方先模拟对方节点，再做真实异地联网联调。
+参与者 | 持有硬件 | 主要职责 | 不等待对方的方法
+A同学 | GOOOUUU ESP32-S3-CAM + OV2640 | 拍照、JPEG上传、摄像头状态、视觉数据集 | 电脑模拟camera/cmd和sensor/data
+B同学（申奥） | 经典ESP32-D0WDQ6学习套件 + ADS1115 | 传感采集、协议、报警执行、电脑服务协调 | 电脑模拟camera/status和vision/result
+共同 | 各自电脑和网络 | 冻结接口、共享Broker、日志对齐、版本发布 | 所有链路用request_id关联
+原本的硬件依赖 | 替代方式 | 效果
+两块板必须直连 | 两板只通过MQTT/HTTP交换数据 | 物理距离不影响接口联调
+摄像头没完成就不能测报警 | B电脑模拟vision/result | B可提前完成报警状态机
+传感器没完成就不能测拍照 | A电脑模拟camera/cmd | A可独立完成拍照上传
+故障靠视频口述 | request_id + 三端日志 | 能定位到命令、上传、推理或执行段
+组件 | 建议位置 | 必须具备 | 实施说明
+MQTT Broker | 公网云服务或项目服务器 | 固定域名、TLS、账号与主题权限 | 禁止长期使用匿名测试Broker
+图片接收API | 公网HTTPS服务 | POST上传、鉴权、大小限制、返回image_id | JPEG走HTTP，不长期塞进MQTT
+临时图片存储 | 服务器或对象存储 | 按request_id命名、自动清理 | 限定原图保留期限
+YOLO电脑 | A或B任一电脑 | 可访问Broker和图片服务 | 无需向公网开放本机端口
+方案 | 适用阶段 | 优点 | 限制
+同一手机热点 | 集中演示 | 简单、延迟低 | 不能解决两地日常开发
+安全HTTPS反向隧道 | 短期联调 | 可临时公开B电脑服务 | 地址可能变化，必须鉴权
+电脑组网VPN | 电脑互传文件/管理服务 | 便于远程维护 | ESP32通常不能直接加入桌面VPN
+匿名公共Broker | 数分钟协议试验 | 无需部署 | 不安全、不稳定，不放正式数据
+参数 | 冻结规则 | 负责人 | 验证
+Broker地址 | 域名、TLS端口固定 | B | 电脑MQTT客户端先互发消息
+设备ID | sensor01、camera01 | 共同 | 不得临时改名
+账号权限 | 最小主题读写权限 | B | 错误账号应被拒绝
+时间格式 | Unix毫秒或ISO 8601二选一 | 共同 | 日志可按时间排序
+schema版本 | physlab.*.v1 | B维护 | 双方启动日志打印版本
+图片上限 | 首版建议约300 KB以内 | A | 超限时自动降低分辨率/质量
+工作项 | A同学 | B同学（申奥） | 共同证据
+板卡点亮 | S3-CAM、OV2640首帧 | 经典ESP32、ADS1115扫描 | 完整启动日志和照片
+通信 | 订阅camera/cmd、发布camera/status | 维护主题/JSON、发布sensor/data | Broker消息记录
+图片链路 | JPEG生成、HTTPS上传、重试 | 图片API与YOLO流程协调 | request_id、HTTP状态、图片
+视觉结果 | 样图质量和数据集协作 | 接收vision/result并驱动报警 | 相同request_id端到端日志
+硬件故障 | 摄像头、排线、PSRAM、A板供电 | ADS1115、传感器、执行器 | 标准故障取证包
+协议变更 | 提出需求并适配A端 | 维护V1文档和兼容性 | 版本记录与双方确认
+禁止事项 | A板不得直接控制B板GPIO；B板不得依赖A板在线才能执行本地采样和保护。视觉结果仅作辅助提示，物理安全阈值必须经过专业成员审核。
+主题 | 方向 | QoS | 用途 | 关键字段
+physlab/sensor01/data | B→服务 | 0 | 周期数据 | device_id, experiment, voltage, ts
+physlab/sensor01/status | B→服务 | 1 | B板状态 | online, rssi, uptime, heap, fw
+physlab/sensor01/cmd | 服务→B | 1 | 采样/阈值/执行器命令 | request_id, action, params
+physlab/camera01/cmd | 服务→A | 1 | 拍照命令 | request_id, resolution, jpeg_quality
+physlab/camera01/status | A→服务 | 1 | 摄像头状态 | online, last_image, heap, error
+physlab/vision/result | YOLO→B | 1 | 识别结果 | request_id, objects, warning, message
+physlab/alarm | 双向 | 1 | 统一告警 | source, code, level, message, ts
+项目 | 约定
+方法与路径 | POST /api/v1/images
+请求头 | Authorization、Content-Type: image/jpeg、X-Device-ID、X-Request-ID
+请求体 | JPEG原始字节，不做Base64
+成功响应 | HTTP 201，返回image_id和received_bytes
+失败重试 | 网络失败/5xx最多2次指数退避；4xx不盲目重试
+幂等 | 同一request_id重复上传返回原image_id
+测试用例 | 模拟warning | B板预期动作
+器材齐全 | none/null | 保持正常，不鸣叫
+缺少电感 | inductor_missing | 短鸣并提示检查电感
+识别超时 | vision_timeout | 提示视觉不可用，本地采样继续
+缺request_id | 协议错误消息 | 拒绝执行并记录protocol_error
+通过条件 | A板应独立完成“命令→拍照→上传→回执”；B板应独立完成“视觉结果→规则判断→报警”。双方均不应等待另一块真实硬件。
+阶段 | 操作 | 保存证据 | 失败先查
+A1 点亮 | 右侧TTL USB-C烧录，输出芯片/Flash/PSRAM | 完整启动日志 | USB线、端口、BOOT/RST
+A2 摄像头 | QVGA单拍，再升VGA JPEG | 首张原图、camera_init码 | 排线、供电、固定引脚
+A3 稳定性 | 连续拍照并归还帧缓冲20次 | 成功率、最低heap | fb_count、分辨率、PSRAM
+A4 MQTT | 上线、心跳、接收capture | Broker记录、命令JSON | 域名、TLS时间、账号权限
+A5 HTTP | 上传JPEG并解析201 | request_id、image_id、字节数 | 证书、大小限制、超时
+A6 联调 | 接收B真实capture | 三端时间戳 | 主题、schema、重复消息
+参数 | 无PSRAM/未确认 | 确认有PSRAM | 说明
+像素格式 | JPEG | JPEG | 不传RGB原始帧
+分辨率 | VGA 640×480 | VGA或SVGA | 稳定后再提高
+jpeg_quality | 12～15 | 10～14 | 数值越小通常图片越大
+fb_count | 1 | 2 | 无PSRAM不开双缓冲
+XCLK | 20 MHz | 20 MHz | 异常时结合例程调整
+阶段 | 操作 | 保存证据 | 失败先查
+B1 点亮 | 串口Hello World、固件版本 | 完整启动日志 | 数据线、COM、板型
+B2 ADS1115 | 扫描0x48、1.65V基准测试 | 万用表对照表 | 供电、SDA/SCL、ADDR
+B3 数据 | 滤波、阈值、sensor/data | JSON和采样记录 | 量程、共地、采样率
+B4 报警 | 模拟vision/result | 各warning动作录像 | 主题、JSON、状态机
+B5 服务 | Broker、图片API、YOLO协调 | 连接参数、服务日志 | TLS、端口、防火墙
+B6 联调 | 向A发capture并收结果 | 同一request_id日志 | 时间戳、协议版本
+测量边界 | ADS1115最高860 SPS，只适合直流和慢变化电压；不能替代示波器采集RLC快速波形。输入不得超过供电允许范围，高压必须先经过合适的分压、限流和保护。
+项目 | 必须回答
+昨天完成 | 写可验证数字，例如连续上传20次成功19次
+今天目标 | 只列1～2个当天可结束的任务
+当前阻塞 | 附错误码、完整日志、照片和复现步骤
+接口变化 | 主题、字段、错误码是否变化；无变化也写无
+需要对方提供 | 明确到文件、消息或测试动作
+内容 | 命名示例 | 用途
+代码提交号 | commit abc1234 | 保证讨论同一版本
+固件版本 | camera01-fw-0.3.0 | 日志和状态消息均打印
+配置摘要 | board、Flash、PSRAM、分辨率、Broker | 排除配置差异
+串口日志 | logs/camera01_日期时间.txt | 保留上电到故障全过程
+图片/视频 | images/req-...jpg | 证明硬件真实行为
+已知问题 | KNOWN_ISSUES.md | 避免重复踩坑
+证据 | 要求 | 目的
+全景照片 | 板子、USB线、外设、供电全部入镜 | 发现接错口、反接、漏接
+局部照片 | 排线锁扣、丝印、模块型号、焊点清晰 | 核对板型和引脚
+完整日志 | 从上电开始，不只截最后一行 | 判断复位原因和初始化顺序
+最小复现 | 断开无关外设 | 排除模块冲突
+测量值 | 供电、基准电压、I2C地址等 | 区分软件和电气错误
+复现概率 | 例如20次失败3次 | 判断供电、内存或随机问题
+现象 | A先查 | B先查 | 共同依据
+A收不到拍照命令 | Broker连接和订阅 | 主题、权限、QoS | Broker消息记录
+收到命令但无图片 | camera_init、排线、帧长度 | 参数是否超约定 | A串口同一request_id
+图片上传失败 | 证书、超时、图片大小 | API在线、鉴权 | HTTP状态和服务日志
+图片到但YOLO无结果 | image_id是否上报 | 推理队列和结果发布 | 图片落盘/推理日志
+YOLO有结果但B不报警 | result是否发布 | 订阅、解析、状态机、执行器 | 原始vision/result JSON
+A连续拍照复位 | 供电、PSRAM、fb_count | 避免快速重复capture | 复位原因、heap、命令频率
+B传感值跳变 | 与A无关 | 接线、量程、滤波、共地 | 万用表和原始码
+两边偶发断线 | RSSI、重连日志 | Broker状态、账号限制 | 统一时间线
+风险 | 控制措施
+MQTT被读取/伪造 | TLS、账号密码、最小主题权限；禁用匿名
+图片API被滥用 | HTTPS、设备Token、大小/频率限制、校验JPEG
+密码泄露 | secrets文件或构建变量，日志打码
+图片含人脸/学号 | 镜头只拍实验台，限制原图保留期限
+远程命令误触发 | 白名单、request_id去重、超时丢弃、本地二次判断
+电气安全 | 不连接未确认高压/市电侧，先确认隔离和共地
+日程 | A目标 | B目标 | 共同里程碑
+D1 | 板卡点亮、自检日志 | 板卡点亮、ADS1115扫描 | 设备ID和日志模板
+D2 | QVGA/VGA单拍 | 基准电压对照 | 冻结MQTT V1
+D3 | 连续拍照20次 | sensor/data/status | Broker验证
+D4 | 订阅camera/cmd | 模拟视觉结果驱动报警 | 各自模拟测试通过
+D5 | HTTP上传/201 | 图片API/占位服务 | request_id贯通图片
+D6 | 断网重连/重试 | MQTT重连/本地保护 | 故障码V1
+D7 | 接入公网服务 | 远程发capture | 首次异地双板联调
+D8 | 实验样图 | 接入YOLO/占位结果 | 图片到报警闭环
+D9 | 稳定性/错误注入 | 稳定性/日志汇总 | 连续20轮测试
+D10 | 发布A固件 | 发布B固件和演示脚本 | 冻结演示版本
+时间 | 操作 | 通过标准
+演示前3～7天 | 冻结协议，不再随意改字段 | A、B使用同一schema
+演示前1～2天 | 同一热点跑完整流程 | 连续20轮成功率≥95%
+演示当天 | 备用热点、USB线、离线固件 | 断网仍可展示本地采集和模拟结果
+降级方案 | 真实YOLO失败时用保存图片和占位识别 | 演示不中断并如实说明
+字段 | 填写内容
+报告人/时间 | 
+节点与版本 | camera01或sensor01；固件版本；Git提交号
+一句话描述 | 
+复现步骤 | 1.；2.；3.
+预期结果 | 
+实际结果 | 
+复现概率 | 例如20次失败3次
+request_id | 
+完整日志 | 文件名/链接
+照片或视频 | 文件名/链接
+已排除因素 | 
+需要对方做什么 | 明确到消息、文件或测试动作
+时间 | 节点 | 事件 | request_id/image_id | 结果/耗时
+ | B电脑 | 发布camera01/cmd |  | 
+ | A板 | 收到命令并拍照 |  | 
+ | A板 | 上传JPEG |  | HTTP状态：
+ | 图片服务 | 接收并存储 |  | 
+ | YOLO电脑 | 推理并发布result |  | 
+ | B板 | 收到结果并报警 |  | 

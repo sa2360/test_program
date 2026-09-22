@@ -1,0 +1,8 @@
+**/.venv/
+**/.pio/
+**/__pycache__/
+**/.env
+**/secrets.h
+cloud/data/
+*.log
+*.rar

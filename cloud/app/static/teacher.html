@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PhysLab 教师实验看板</title>
+  <link rel="stylesheet" href="/assets/styles.css">
+</head>
+<body>
+  <header>
+    <div class="topline">
+      <div><h1>PhysLab 教师实验看板</h1><p>答复学生问题，复核拍照结果，并依据真实记录查看课堂洞察。</p></div>
+      <nav><a href="/student">学生端</a><a href="/teacher">教师端</a></nav>
+    </div>
+  </header>
+  <main class="grid">
+    <section class="panel wide">
+      <h2>数据范围与授课建议</h2>
+      <div class="notice">此页面适用于受控实验室内部网络。当前没有自动视觉模型时，图片状态为 unknown，不应被视为已完成识别。</div>
+      <button id="refresh-insights" type="button">刷新统计</button>
+      <div id="insights" class="muted">正在读取真实记录。</div>
+    </section>
+    <section class="panel wide">
+      <h2>学生问题与回复</h2>
+      <button id="refresh-questions" type="button">刷新问题</button>
+      <div id="questions" class="muted">正在读取问题。</div>
+    </section>
+    <section class="panel wide">
+      <h2>图片人工复核</h2>
+      <p class="muted">只在你已查看实际器材、接线或照片后提交结论。人工结果会同步给设备端，并进入统计。</p>
+      <button id="refresh-images" type="button">刷新图片</button>
+      <div id="images" class="image-list"></div>
+    </section>
+  </main>
+  <footer>统计只引用已记录的学生问题、人工或模型视觉结果和设备告警，不会把未配置视觉模型的 unknown 当作错误。</footer>
+  <script src="/assets/teacher.js" defer></script>
+</body>
+</html>

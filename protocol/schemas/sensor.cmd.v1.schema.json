@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://physlab.local/schemas/sensor.cmd.v1.schema.json",
+  "title": "PhysLab sensor command V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "request_id", "ts", "action", "params"],
+  "properties": {
+    "schema": {"const": "physlab.sensor.cmd.v1"},
+    "request_id": {"type": "string", "minLength": 1, "maxLength": 96},
+    "ts": {"type": "integer", "minimum": 0},
+    "action": {"enum": ["sample_now", "set_threshold", "set_actuator"]},
+    "params": {"type": "object"}
+  }
+}

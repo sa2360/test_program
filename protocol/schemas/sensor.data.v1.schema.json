@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://physlab.local/schemas/sensor.data.v1.schema.json",
+  "title": "PhysLab sensor data V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "device_id", "experiment", "ts", "voltage_v", "temperature_c", "quality"],
+  "properties": {
+    "schema": {"const": "physlab.sensor.data.v1"},
+    "device_id": {"const": "sensor01"},
+    "experiment": {"enum": ["rlc_series", "rlc_transient", "wheatstone_bridge"]},
+    "ts": {"type": "integer", "minimum": 0},
+    "voltage_v": {"type": ["number", "null"]},
+    "temperature_c": {"type": ["number", "null"]},
+    "quality": {"enum": ["ok", "degraded", "invalid"]},
+    "request_id": {"type": "string", "minLength": 1, "maxLength": 96},
+    "channel": {"enum": ["A0", "A1", "A2", "A3"]},
+    "raw": {"type": "integer", "minimum": -32768, "maximum": 32767},
+    "calibrated": {"type": "boolean"},
+    "range_v": {"type": "number", "exclusiveMinimum": 0}
+  }
+}

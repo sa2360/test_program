@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://physlab.local/schemas/sensor.status.v1.schema.json",
+  "title": "PhysLab sensor status V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "device_id", "ts", "online", "rssi", "uptime_ms", "heap_bytes", "fw", "clock_synced", "error"],
+  "properties": {
+    "schema": {"const": "physlab.sensor.status.v1"},
+    "device_id": {"const": "sensor01"},
+    "ts": {"type": "integer", "minimum": 0},
+    "online": {"type": "boolean"},
+    "rssi": {"type": "integer", "minimum": -127, "maximum": 0},
+    "uptime_ms": {"type": "integer", "minimum": 0},
+    "heap_bytes": {"type": "integer", "minimum": 0},
+    "fw": {"type": "string", "minLength": 1, "maxLength": 32},
+    "clock_synced": {"type": "boolean"},
+    "ads_initialized": {"type": "boolean"},
+    "error": {"type": ["string", "null"], "maxLength": 128}
+  }
+}

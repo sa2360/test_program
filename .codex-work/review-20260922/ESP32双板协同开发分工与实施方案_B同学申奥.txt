@@ -1,0 +1,274 @@
+技术实施与协作指南
+ESP32双板协同开发
+分工与实施方案
+经典ESP32传感控制节点 + ESP32-S3-CAM视觉节点 + 边缘电脑YOLO + 云端智能体
+核心结论
+
+1. 方案目标与边界
+本方案用于指导经典ESP32传感控制节点与ESP32-S3-CAM视觉节点并行开发，建立可复现、可分工、可验收的端边云闭环。系统服务于RLC串联电路、RLC暂态过程和惠斯通电桥测电阻等大学物理实验。
+1.1 第一阶段必须实现
+经典ESP32能够读取ADS1115及基础传感器，并按统一JSON格式发布MQTT消息。
+ESP32-S3-CAM能够在收到指令后拍摄OV2640图像，并通过HTTP上传JPEG。
+电脑端能够完成YOLO推理或占位识别，并把结果发布回MQTT。
+经典ESP32能够接收视觉结果，触发蜂鸣器、LED或显示提醒。
+系统具备断线重连、状态上报、超时处理和基础日志。
+1.2 明确不作为第一阶段目标
+不要求经典ESP32或ESP32-S3-CAM本地运行完整YOLOv8。
+不要求ESP32替代实验室示波器采集高速RLC波形。
+不要求第一版同时完成语音、视觉、知识库和三类实验的全部逻辑。
+不以申请书中的15 FPS端侧YOLO指标作为当前硬件验收条件。
+2. 总体技术架构
+2.1 主数据流
+经典ESP32采集ADS1115电压及其他传感器数据，发布到sensor/data。
+规则或用户操作触发camera/cmd，S3-CAM拍照并将JPEG上传到电脑端。
+电脑端运行YOLO，结合实验类型和传感器数据形成判断。
+电脑端向vision/result发布识别结果，并按需调用云端知识库生成解释。
+经典ESP32订阅结果主题，执行蜂鸣器、LED、OLED或继电器反馈。
+3. 双板硬件职责
+3.1 经典ESP32传感控制节点
+定位：系统的实时采集、通信和执行控制中心。该节点不处理图片，也不运行复杂AI模型。
+3.2 ESP32-S3-CAM视觉节点
+定位：可靠的图像采集与上传节点。OV2640负责生成JPEG；S3-CAM仅进行必要的缩放、压缩和质量控制。
+硬件已核对：视觉板为GOOOUUU ESP32-S3-CAM，原理图BOM为ESP32-S3-WROOM-1-N8，OV2640固定占用GPIO4～18中的指定引脚。Flash按8 MB配置，PSRAM必须由固件运行时检测；无PSRAM时采用VGA、单帧缓冲。
+4. 人员分工与交付物
+4.1 B同学（申奥）的工作边界
+对双板通信协议拥有主导权：主题、字段、错误码和版本号由B维护。
+保证经典ESP32节点可以脱离摄像头独立运行和上报传感器数据。
+提供电脑端模拟发布脚本，使S3-CAM未完成时也能测试报警逻辑。
+负责把视觉结果、传感器结果和实验规则整合为统一事件。
+不承担物理实验规则的最终正确性审核；不承诺端侧完整YOLO。
+5. MQTT主题与消息协议
+Broker可先部署在开发电脑。所有主题统一使用小写英文，设备编号放在路径中。消息编码采用UTF-8 JSON，时间统一使用Unix毫秒或ISO 8601，两者选一后不得混用。
+5.1 传感器数据示例
+5.2 拍照命令与视觉结果示例
+6. HTTP图片上传接口
+7. 软件工程结构
+7.1 Git协作约定
+main分支仅合并可编译、可运行的版本；每项功能使用独立分支。
+协议变更必须同步修改protocol目录和schema版本，禁止只改一端。
+提交信息使用feat/fix/docs/test前缀，例如feat(sensor): add ADS1115 sampling。
+Wi-Fi密码、Broker密码和云端Token放入不提交的secrets配置。
+每次联调记录固件版本、接线、输入条件、实际输出和失败截图。
+8. 分阶段开发计划
+9. 联调流程与故障定位
+9.1 标准联调顺序
+只启动Broker，使用MQTT客户端验证主题可发布和订阅。
+启动经典ESP32，确认status心跳和sensor/data数据。
+用电脑模拟发布vision/result，确认ESP32能正确报警。
+启动图片接收服务，用curl或测试图片验证HTTP接口。
+启动S3-CAM，先手动拍照上传，再接入camera/cmd。
+启动YOLO服务，把图片、request_id和识别结果串起来。
+最后加入物理实验规则和云端知识回答，记录端到端时延。
+9.2 故障定位表
+10. 验收指标
+说明：视觉准确率应由真实标注测试集计算，不能使用训练集结果；物理实验规则必须由物理专业成员审核后才能作为正式提醒。
+11. 安全与测量约束
+ADS1115以3.3V供电时，任何模拟输入不得直接超过供电范围；高压输入需分压、限流和钳位。
+不得把ESP32/电脑USB地线直接连接到未确认隔离的市电侧或浮地高压电路。
+ADS1115最高860 SPS，只用于直流和慢变化信号；RLC快速波形使用实验室示波器或专用高速采集设备。
+摄像头数据涉及人员时应限制拍摄范围，保存原图要有明确用途和保留期限。
+视觉告警仅作实验辅助，不能替代教师、安全规程和仪器保护。
+12. 风险与应对
+13. 到货与开工检查表
+13.1 B同学经典ESP32节点
+□ 主板可识别COM口并完成串口Hello World。
+□ PlatformIO使用esp32dev环境可编译和烧录。
+□ ADS1115在I2C扫描中显示0x48。
+□ 1.65V分压测试读数与万用表基本一致。
+□ Wi-Fi、MQTT和JSON例程分别通过。
+□ 蜂鸣器或LED能根据模拟vision/result触发。
+13.2 ESP32-S3-CAM节点
+□ 已保存GOOOUUU ESP32-S3-CAM实物、尺寸、引脚图及原理图。
+□ Flash按N8的8 MB配置；已固化OV2640引脚；PSRAM在启动日志中实测，不凭商品图假定。
+□ 官方示例能生成OV2640 JPEG。
+□ VGA图片可连续拍摄20次。
+□ HTTP上传可携带device_id和request_id。
+□ 断网恢复后能重新上线并发送状态。
+14. 第一轮演示脚本
+展示经典ESP32在线状态及ADS1115实时电压。
+模拟电压超过阈值，经典ESP32先触发本地报警并发布alarm。
+在电脑端发送capture命令，S3-CAM拍摄实验器材。
+电脑端YOLO识别器材；若缺少电感，发布inductor_missing。
+经典ESP32收到视觉结果后蜂鸣器提示，电脑显示中文解释。
+调用知识库回答“RLC串联电路如何判断谐振”，展示端边云闭环。
+最后展示日志：传感器值、图片ID、识别结果、告警和响应时延。
+15. A同学视觉板硬件确认（同步版）
+本节把A同学新提交的硬件资料同步进总方案。B同学无需更换自己的经典ESP32，也不应把摄像头接到B板；A板专职拍照和上传，B板继续负责ADS1115、传感器、MQTT结果接收与报警。两板唯一强耦合点是冻结后的MQTT/HTTP协议。
+15.1 A板摄像头固定引脚
+15.2 双板联调时的责任切分
+冻结原则：A板上报的image_id/request_id和B板使用的request_id必须完全一致；PSRAM、分辨率等硬件差异只影响A板内部实现，不得改变V1协议字段。
+附录A：建议的PlatformIO环境
+附录B：最终责任确认
+本方案以当前已确认硬件为基础：B同学使用经典ESP32-D0WDQ6中配学习套件与ADS1115；团队成员使用带OV2640的ESP32-S3-CAM。后续如硬件型号或分工变化，应更新版本号和责任表。
+项目名称 | 基于ESP32的大学物理电路实验多模态智能助手的设计与实现
+重点对象 | B同学（申奥）及双板协作成员
+硬件节点 | 经典ESP32-D0WDQ6中配套件；ESP32-S3-CAM + OV2640
+实施原则 | ESP32端采集与控制，边缘电脑视觉推理，云端知识问答
+版本日期 | 2026年7月13日 · V1.0
+不要求经典ESP32本地运行YOLO。B同学负责传感控制节点、通信协议与系统集成；S3-CAM节点只负责可靠拍照和上传；YOLO运行在电脑端，识别结果通过MQTT返回ESP32。该方案成本低、可并行开发、易于验收。
+层级 | 组成 | 主要职责 | 输出
+端侧A | 经典ESP32-D0WDQ6中配底板 | ADS1115和传感器采集、阈值判断、执行器控制、MQTT通信 | 传感数据、状态、报警反馈
+端侧B | ESP32-S3-CAM + OV2640 | 按指令拍照、JPEG压缩、HTTP上传、摄像头状态上报 | 图片URL/上传结果/设备状态
+边缘侧 | Windows电脑 + Python | YOLO训练与推理、规则融合、图片服务、MQTT桥接 | 检测框、类别、置信度、告警
+云端 | HiAgent/知识库/ASR/TTS | 实验问答、规则解释、语音能力和日志汇总 | 回答文本、语音资源、知识检索结果
+模块 | 建议接口 | 职责 | 注意事项
+ADS1115 | I2C；SDA GPIO21、SCL GPIO22 | 直流/慢变化电压、电桥平衡量采集 | 3.3V供电；高于3.3V需分压保护
+DS18B20 | 单总线；引脚按底板确认 | 温度与设备环境监测 | 数据线上拉4.7kΩ
+蜂鸣器/LED | 数字GPIO | 告警、状态和联调反馈 | 启动脚GPIO需避免误用
+MQTT客户端 | Wi-Fi | 发布数据、订阅命令与结果 | 采用非阻塞重连和心跳
+TF卡（可选） | SPI/SDMMC，按底板资料 | 断网缓存与测试日志 | 与其他SPI设备核对片选
+功能 | 第一版要求 | 建议参数 | 验收
+摄像头初始化 | 按实际开发板引脚表配置OV2640 | JPEG模式；先QVGA/VGA | 连续启动10次成功
+拍照 | MQTT命令或HTTP接口触发 | VGA 640×480起步 | 单次拍照成功率≥95%
+压缩 | 控制内存与网络开销 | JPEG质量10～20区间测试 | 单图尺寸可稳定上传
+上传 | HTTP POST multipart或application/jpeg | 5秒超时、最多2次重试 | 电脑端收到完整JPEG
+状态 | MQTT上报在线、错误和内存 | 30秒心跳 | 断线后自动恢复
+角色 | 建议负责人 | 核心任务 | 必须交付
+系统集成与协议负责人 | B同学：申奥 | 经典ESP32固件、ADS1115、Wi-Fi/MQTT、JSON协议、电脑端接口协调、联调记录 | sensor-node代码；协议文档；联调脚本；测试报告
+视觉节点负责人 | 持有S3-CAM的同学 | OV2640驱动、拍照命令、JPEG上传、心跳与错误状态 | camera-node代码；引脚表；拍照样例；稳定性记录
+视觉算法负责人 | 计算机成员协作 | 数据采集、标注、YOLO训练、推理服务、结果格式 | 数据集说明；模型权重；推理服务；指标报告
+物理规则负责人 | 物理专业成员 | 三类实验规则、阈值、安全性、错误解释审核 | 规则表；测试用例；审核记录
+知识库与材料负责人 | 团队协作 | HiAgent知识库、Prompt、问答集和文档归档 | 知识条目；问答测试集；演示脚本
+主题 | 方向 | QoS | 用途 | 主要字段
+physlab/sensor01/data | ESP32→电脑 | 0 | 传感器周期数据 | device_id, experiment, voltage, temperature, ts
+physlab/sensor01/status | ESP32→电脑 | 1 | 心跳与设备状态 | online, rssi, uptime, heap, fw
+physlab/sensor01/cmd | 电脑→ESP32 | 1 | 采样、阈值和执行器命令 | request_id, action, params
+physlab/camera01/cmd | 电脑→S3-CAM | 1 | 拍照与配置命令 | request_id, action, resolution, quality
+physlab/camera01/status | S3-CAM→电脑 | 1 | 摄像头状态 | online, last_image, heap, error
+physlab/vision/result | 电脑→ESP32 | 1 | YOLO与规则判断结果 | request_id, objects, warning, message
+physlab/assistant/answer | 云端→ESP32/电脑 | 1 | 知识问答结果 | question_id, answer, severity
+physlab/alarm | 双向 | 1 | 统一告警事件 | source, code, level, message, ts
+{
+  "schema": "physlab.sensor.v1",
+  "device_id": "sensor01",
+  "experiment": "wheatstone_bridge",
+  "ts": "2026-07-13T10:20:30.125+08:00",
+  "voltage_v": 1.247,
+  "temperature_c": 26.4,
+  "quality": "ok"
+}
+// Topic: physlab/camera01/cmd
+{
+  "schema": "physlab.camera.cmd.v1",
+  "request_id": "req-00017",
+  "action": "capture",
+  "resolution": "VGA",
+  "jpeg_quality": 15
+}
+
+// Topic: physlab/vision/result
+{
+  "schema": "physlab.vision.v1",
+  "request_id": "req-00017",
+  "experiment": "rlc_series",
+  "objects": [
+    {"name": "resistor", "confidence": 0.92},
+    {"name": "capacitor", "confidence": 0.88}
+  ],
+  "warning": "inductor_missing",
+  "message": "未检测到电感，请检查器材和接线"
+}
+项目 | 约定
+接口 | POST /api/v1/images
+请求头 | Content-Type: image/jpeg；X-Device-Id；X-Request-Id
+请求体 | JPEG原始字节；第一版不使用Base64以减少体积
+成功响应 | HTTP 201；返回image_id、received_bytes和created_at
+失败处理 | 4xx不盲目重试；5xx或超时最多重试2次，指数退避
+安全 | 仅在项目局域网运行；后续云端部署再增加Token和TLS
+HTTP/1.1 201 Created
+Content-Type: application/json
+
+{
+  "image_id": "img-20260713-00017",
+  "request_id": "req-00017",
+  "received_bytes": 48612,
+  "status": "queued"
+}
+physlab-assistant/
+├─ firmware/
+│  ├─ sensor-node/          # B同学维护：经典ESP32
+│  │  ├─ platformio.ini
+│  │  ├─ include/pins_b.h
+│  │  └─ src/               # adc, sensors, mqtt, rules, actuators
+│  └─ camera-node/          # S3-CAM负责人维护
+│     ├─ platformio.ini
+│     ├─ include/camera_pins.h
+│     └─ src/               # camera, http_upload, mqtt_cmd, status
+├─ edge/
+│  ├─ api/                  # 图片接收服务
+│  ├─ vision/               # YOLO推理
+│  ├─ mqtt_bridge/          # 结果发布与规则融合
+│  └─ tests/
+├─ knowledge/               # 三类实验知识与问答测试集
+├─ protocol/                # MQTT/HTTP协议与JSON Schema
+├─ docs/                    # 接线、测试、演示和验收记录
+└─ datasets/README.md       # 数据来源与标注规范，不直接提交大体积原图
+阶段 | 时间建议 | B同学任务 | S3-CAM/其他成员任务 | 验收出口
+P0 硬件确认 | 1～2天 | 确认经典ESP32、底板、ADS1115引脚 | 确认S3-CAM型号、PSRAM和OV2640引脚 | 两份硬件清单和照片
+P1 单板自测 | 3天 | 串口、I2C扫描、ADS1115、蜂鸣器 | CameraWebServer或拍照示例 | 两块板分别稳定运行
+P2 通信基础 | 3～4天 | MQTT主题、JSON、重连、模拟消息 | 订阅拍照命令和状态上报 | Broker可见双节点心跳
+P3 图片链路 | 4～5天 | 图片API与请求追踪 | JPEG拍摄和HTTP上传 | 连续20次上传成功≥19次
+P4 视觉闭环 | 5～7天 | 结果订阅、蜂鸣器/LED反馈 | YOLO或占位识别服务 | 拍照到反馈全链路完成
+P5 实验逻辑 | 1～2周 | ADS1115规则和事件融合 | 数据集、规则审核、知识库 | 完成至少1类实验演示
+P6 稳定性 | 3～5天 | 异常恢复、日志和验收记录 | 光照、网络和多次运行测试 | 连续运行2小时无人工重启
+现象 | 优先检查 | 责任边界 | 判定方法
+ESP32无数据 | 供电、COM口、Wi-Fi、Broker地址 | B同学 | 串口日志和MQTT客户端
+ADS1115找不到 | 3.3V、共地、SDA/SCL、0x48 | B同学 | I2C扫描
+S3-CAM初始化失败 | 引脚、PSRAM、供电、摄像头排线 | 视觉节点负责人 | 官方示例和串口错误码
+图片上传失败 | 电脑IP、防火墙、请求头、超时 | 双方协查 | 服务端访问日志
+YOLO有图无结果 | 模型路径、类别、阈值、图像方向 | 算法负责人 | 离线单图推理
+结果不触发报警 | 主题、QoS、JSON字段、request_id | B同学 | 模拟发布固定结果
+物理判断不正确 | 阈值、实验阶段、规则定义 | 物理规则负责人 | 标准实验用例复核
+类别 | 指标 | 最低验收值 | 记录方式
+传感采集 | ADS1115读取成功率 | 连续100次无通信错误 | 串口/CSV日志
+MQTT | 掉线恢复 | 断网后恢复网络可自动重连 | 断网测试记录
+摄像头 | 拍照上传成功率 | 20次中至少19次成功 | 服务端日志
+视觉链路 | 拍照到结果返回 | 局域网演示建议≤5秒 | request_id时间戳
+反馈 | 告警执行 | 收到warning后1秒内触发 | 视频/日志
+稳定性 | 连续运行 | 至少2小时无人工重启 | 心跳和内存趋势
+可复现性 | 他人部署 | 按README可重新烧录和运行 | 复现签字/记录
+风险 | 影响 | 应对策略 | 触发升级条件
+S3-CAM板型不明 | 摄像头无法初始化 | 先跑商家/官方示例，保存引脚表 | 连续更换配置仍失败
+网络不稳定 | 图片或结果丢失 | QoS1、重试、request_id、状态心跳 | 局域网丢包仍显著
+YOLO数据不足 | 识别误报漏报 | 先做器材检测，再做接线规则；增加真实场景数据 | 核心类别准确率不足
+经典ESP32资源不足 | 多任务阻塞 | 节点拆分、非阻塞状态机、减少动态内存 | 持续重启或堆内存下降
+申请书指标过高 | 验收叙述不实 | 改为端边云协同，记录真实指标 | 指导教师要求端侧证明
+资源 | A板确认值 | 对双板协同的影响
+板型/模组 | GOOOUUU ESP32-S3-CAM；ESP32-S3-WROOM-1-N8 | A使用S3固件环境，B继续使用esp32dev，两个构建环境分开
+摄像头 | OV2640，GPIO4/5/6/7/8/9/10/11/12/13/15/16/17/18 | 上述脚全部视为A板摄像头专用，不安排其他外设
+TF卡 | GPIO38/39/40 | 首版不用TF卡可减少冲突；需要离线缓存时再启用1-bit模式
+串口下载 | GPIO43/44，经右侧TTL USB-C/CH340C | A通过串口输出camera_init、内存和上传错误；B按request_id定位跨板问题
+原生USB | GPIO19/20，左侧OTG USB-C | 首版不用原生USB传图，图片统一走Wi-Fi/HTTP
+PSRAM | 资料未确认；运行时检测 | 协议不依赖高分辨率，A可在无PSRAM时以VGA单缓冲交付
+信号 | GPIO | 信号 | GPIO
+SIOD/SDA | 4 | SIOC/SCL | 5
+VSYNC | 6 | HREF | 7
+XCLK | 15 | PCLK | 13
+D0/Y2 | 11 | D1/Y3 | 9
+D2/Y4 | 8 | D3/Y5 | 10
+D4/Y6 | 12 | D5/Y7 | 18
+D6/Y8 | 17 | D7/Y9 | 16
+PWDN | 固定低，代码-1 | RESET | 接EN，代码-1
+现象 | A同学先查 | B同学先查 | 共同判定依据
+没有图片 | camera_init、排线、供电、首帧长度 | camera/cmd是否带request_id | A板串口日志与MQTT命令时间戳
+图片有但YOLO无结果 | HTTP状态码、图片ID、JPEG完整性 | 电脑服务是否收到相同request_id | 接收服务日志和图片落盘记录
+YOLO有结果但B板不报警 | vision/result是否成功发布 | 订阅主题、JSON字段、阈值与执行器 | 同一request_id的三段日志
+连续拍照复位 | PSRAM检测、分辨率、fb_count、USB线 | 避免短时间重复下发capture | 复位原因、最小堆内存、命令频率
+[env:sensor-node]
+platform = espressif32
+board = esp32dev
+framework = arduino
+monitor_speed = 115200
+lib_deps =
+    bblanchon/ArduinoJson
+    knolleary/PubSubClient
+    adafruit/Adafruit ADS1X15
+
+# S3-CAM的board值必须根据实际型号确定，不能直接照抄。
+# 若商家未提供PlatformIO板型，先用其Arduino/ESP-IDF官方示例确认。
+确认项 | 负责人 | 完成日期 | 结果/备注
+经典ESP32引脚与ADS1115接线 | 申奥 |  | 
+S3-CAM型号、PSRAM与摄像头引脚 | 视觉节点负责人 |  | 
+MQTT/HTTP协议V1冻结 | 申奥 + 视觉节点负责人 |  | 
+至少一个实验规则审核 | 物理规则负责人 |  | 
+端到端演示与稳定性测试 | 项目组 |  | 

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://physlab.local/schemas/assistant.answer.v1.schema.json",
+  "title": "PhysLab assistant answer V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "device_id", "request_id", "experiment", "ts", "answer", "severity", "source", "error"],
+  "properties": {
+    "schema": {"const": "physlab.assistant.answer.v1"},
+    "device_id": {"type": "string", "minLength": 1, "maxLength": 64},
+    "request_id": {"type": "string", "minLength": 1, "maxLength": 96},
+    "experiment": {"enum": ["rlc_series", "rlc_transient", "wheatstone_bridge", "general"]},
+    "ts": {"type": "integer", "minimum": 0},
+    "answer": {"type": "string", "minLength": 1, "maxLength": 1000},
+    "severity": {"enum": ["info", "warning", "critical"]},
+    "source": {"enum": ["agnes", "local_knowledge", "fallback"]},
+    "error": {"type": ["string", "null"], "maxLength": 128}
+  }
+}

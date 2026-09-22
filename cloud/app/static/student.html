@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PhysLab 学生实验助手</title>
+  <link rel="stylesheet" href="/assets/styles.css">
+</head>
+<body>
+  <header>
+    <div class="topline">
+      <div>
+        <h1>PhysLab 学生实验助手</h1>
+        <p>步骤学习、AI 问答、拍照记录、教师答疑和实验数据整理。</p>
+      </div>
+      <nav><a href="/student">学生端</a><a href="/teacher">教师端</a></nav>
+    </div>
+  </header>
+  <main class="grid">
+    <section class="panel wide">
+      <h2>1. 选择实验并查看步骤</h2>
+      <div class="inline">
+        <div><label for="experiment">实验项目</label><select id="experiment"></select></div>
+        <div><label for="student-name">学生姓名或编号</label><input id="student-name" maxlength="60" placeholder="用于查看你的教师回复"></div>
+      </div>
+      <p id="experiment-summary" class="muted"></p>
+      <div id="steps" class="steps"></div>
+      <div id="safety" class="notice"></div>
+    </section>
+
+    <section class="panel">
+      <h2>2. AI 小助手</h2>
+      <p id="voice-status" class="muted"></p>
+      <label for="assistant-question">输入或语音说出问题</label>
+      <textarea id="assistant-question" maxlength="500" placeholder="例如：RLC 串联谐振频率如何计算？"></textarea>
+      <button id="start-voice" type="button">语音输入</button><button id="ask-assistant" type="button">询问 AI</button><button id="speak-answer" class="secondary" type="button">朗读回答</button>
+      <div id="assistant-answer" class="answer hidden" aria-live="polite"></div>
+      <p class="muted">回答会标注来源；本地资料标记为待物理专业同学审核时，不能替代实验结论。</p>
+    </section>
+
+    <section class="panel">
+      <h2>3. 向老师提问</h2>
+      <label for="teacher-question">问题</label>
+      <textarea id="teacher-question" maxlength="500" placeholder="请描述实验条件、已观察到的现象和你的问题。"></textarea>
+      <button id="send-teacher-question" type="button">发送给老师</button>
+      <div id="teacher-status" class="status hidden" aria-live="polite"></div>
+      <div id="my-questions"></div>
+    </section>
+
+    <section class="panel wide">
+      <h2>4. 实验数据整理</h2>
+      <p class="muted">先创建本次实验的数据表，再逐行录入原始读数；可导出 CSV 后用于作图或写报告。</p>
+      <div class="inline"><div><label for="dataset-title">数据表名称</label><input id="dataset-title" maxlength="80" placeholder="例如：第 2 组扫频记录"></div><button id="create-dataset" type="button">创建数据表</button><button id="download-csv" class="secondary" type="button">导出 CSV</button></div>
+      <div id="dataset-area" class="muted">尚未创建数据表。</div>
+    </section>
+
+    <section class="panel wide">
+      <h2>5. 拍照分析</h2>
+      <p>相机拍照请求会发送至实验室相机节点。没有已配置视觉模型时，系统只会显示“未作视觉判断”，需要人工检查。</p>
+      <button id="request-capture" type="button">请求相机拍照</button>
+      <div id="capture-status" class="status hidden" aria-live="polite"></div>
+      <div id="capture-result"></div>
+    </section>
+  </main>
+  <footer>仅限受控实验室网络使用。调整接线或元件前必须断电；异常时停止实验并联系教师。</footer>
+  <script src="/assets/student.js" defer></script>
+</body>
+</html>

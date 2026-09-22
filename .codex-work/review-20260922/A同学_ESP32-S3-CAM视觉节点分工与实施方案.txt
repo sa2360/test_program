@@ -1,0 +1,218 @@
+视觉节点开发指南
+A同学分工与实施方案
+ESP32-S3-CAM + OV2640 · 图像采集、上传、数据集协作与视觉联调
+岗位结论
+
+1. 岗位目标与边界
+A同学是视觉数据入口负责人，工作质量直接决定后续YOLO训练、接线识别和错误预警的上限。第一阶段以“稳定拍照、可靠上传、可追踪请求”为主，不以端侧复杂推理为目标。
+1.1 必须完成
+按已提供原理图锁定GOOOUUU ESP32-S3-CAM与OV2640引脚；启动时检测Flash/PSRAM并记录结果。
+完成摄像头初始化、单次拍照、JPEG输出和基础画质调节。
+支持MQTT拍照命令，并通过HTTP把JPEG原始字节上传到电脑。
+上报在线状态、剩余堆内存、最后图片ID和错误码。
+协助采集器材、正确接线和错误接线图片，维护数据来源记录。
+与B同学完成request_id贯通和视觉结果回传联调。
+1.2 不承担或不单独承担
+不在S3-CAM上部署完整YOLOv8并承诺15 FPS。
+不独自决定物理实验接线规则和安全阈值。
+不负责经典ESP32的ADS1115、蜂鸣器和执行器驱动。
+不把摄像头节点设计成唯一控制中心；它掉线时传感节点仍应工作。
+2. A与B的协作关系
+接口原则：A节点只发布事实数据（图片、状态、错误），不要直接控制B节点GPIO；所有跨板动作通过MQTT主题完成。
+3. 硬件确认与接线责任
+3.1 到货后硬件核对
+拍摄开发板正面、背面、模组丝印、摄像头正反面和排线方向。
+读取商家资料，确认开发板名称、摄像头引脚、Flash和PSRAM。
+确认USB接口是原生USB还是USB转串口，以及BOOT下载方法。
+确认OV2640供电和排线插入方向，禁止带电反复插拔排线。
+保存原理图、引脚图、例程链接和购买页截图到项目docs目录。
+3.2 建议摄像头起步参数
+本板已按GOOOUUU ESP32-S3-CAM原理图核对引脚，禁止套用AI-Thinker经典ESP32-CAM引脚。建议参数：JPEG、20 MHz XCLK、VGA、质量12～15；检测到PSRAM时使用2个帧缓冲，否则使用1个并降低分辨率。
+3.3 已确认的主板、接口与容量边界
+实物为GOOOUUU ESP32-S3-CAM，板宽约28.0 mm、长约62.2 mm，带OV2640、TF卡槽、双USB-C、CH340C、BOOT/RST键和板载WS2812。原理图BOM标注ESP32-S3-WROOM-1-N8，即8 MB Flash版本；资料不能证明板上一定带PSRAM。固件必须打印ESP.getFlashChipSize()、ESP.getPsramSize()和psramFound()，不得把商家通用引脚图中的“PSRAM”标色当成已安装容量证明。
+3.4 OV2640摄像头固定引脚表
+3.5 板载资源与禁止冲突清单
+A节点第一版只接摄像头并使用Wi-Fi上传，外接传感器尽量不放在此板。确需扩展时，先在GPIO1、GPIO14、GPIO21、GPIO41、GPIO42、GPIO47中选择，并逐一核对启动、电气能力及现有固件；不得占用摄像头固定脚。
+3.6 可直接使用的摄像头引脚常量
+// GOOOUUU ESP32-S3-CAM + OV2640（由所给原理图核对）
+#define CAM_PIN_PWDN   -1
+#define CAM_PIN_RESET  -1
+#define CAM_PIN_XCLK   15
+#define CAM_PIN_SIOD    4
+#define CAM_PIN_SIOC    5
+#define CAM_PIN_D7     16
+#define CAM_PIN_D6     17
+#define CAM_PIN_D5     18
+#define CAM_PIN_D4     12
+#define CAM_PIN_D3     10
+#define CAM_PIN_D2      8
+#define CAM_PIN_D1      9
+#define CAM_PIN_D0     11
+#define CAM_PIN_VSYNC   6
+#define CAM_PIN_HREF    7
+#define CAM_PIN_PCLK   13
+
+// 起步策略：PIXFORMAT_JPEG，XCLK=20 MHz，VGA，jpeg_quality=12~15。
+// 若 psramFound()：fb_count=2；否则 fb_count=1，并保持 VGA 或更低。
+上电自检必须输出：板型/固件版本、Flash字节数、PSRAM字节数、摄像头初始化返回码、首帧长度、Wi-Fi RSSI。只有首帧JPEG大于0且SOI/EOI标记有效，才进入MQTT待命状态。
+3.7 推荐的拍照参数与降级顺序
+注意：jpeg_quality数值越小画质越高、图片通常越大。首版验收看连续20次拍照上传成功率，不追求最高分辨率。
+4. S3-CAM固件模块
+4.1 建议状态机
+禁止在主循环中长时间delay。拍照、上传和重连需要设置超时，避免摄像头节点永久卡死。
+5. MQTT与HTTP接口
+5.1 拍照命令
+5.2 状态消息
+6. 图像数据集协作
+A同学应把“拍到图”升级为“可用于训练和测试的图”。数据必须覆盖真实实验台、光照变化、导线遮挡、器材反光和不同拍摄角度。
+文件名包含实验、类别、场景和序号，例如rlc_resistor_labA_0001.jpg。
+记录图片来源、拍摄日期、是否含人物和授权情况。
+视频抽帧时避免把相邻近重复帧同时分到训练集与测试集。
+物理规则负责人确认错误接线类别，避免算法标签与实验原理矛盾。
+7. 开发计划与交付
+8. 验收指标
+9. 常见故障与排查
+10. 安全、隐私与文档要求
+摄像头只拍实验台和器材，尽量避开人脸、学号和个人物品。
+原始图片按用途保存；用于测试的数据与用于训练的数据分开管理。
+Wi-Fi密码、云端Token和Broker密码不得提交到Git仓库。
+每次发布固件记录版本号、板型、引脚、分辨率、质量和已知问题。
+视觉结果只是辅助提示，物理安全判断必须经过专业成员审核。
+11. A同学开工检查表
+□ 已确认板型为GOOOUUU ESP32-S3-CAM；原理图BOM为ESP32-S3-WROOM-1-N8（8 MB Flash），PSRAM须由程序实测。
+□ 已按原理图保存OV2640引脚表，并使用本文常量完成camera_config_t配置。
+□ 已完成VGA JPEG拍照并保存样图。
+□ 已连接项目MQTT Broker并发布心跳。
+□ 已支持camera/cmd和request_id。
+□ 已完成JPEG HTTP上传和201响应解析。
+□ 已与B同学冻结MQTT/HTTP协议V1。
+□ 已完成至少20次连续拍照上传测试。
+□ 已提交首批器材图片及数据说明。
+□ 已完成一次拍照→YOLO→MQTT结果的端到端联调。
+附录：责任确认表
+适用前提：本方案将“A同学”定义为团队中持有ESP32-S3-CAM与OV2640、负责视觉采集节点的成员。若团队内部A的实际身份或职责不同，应在不改变双板接口的前提下调整负责人名称。
+项目 | 内容
+项目名称 | 基于ESP32的大学物理电路实验多模态智能助手的设计与实现
+岗位定位 | ESP32-S3-CAM视觉采集节点负责人
+协作对象 | B同学申奥：传感控制节点、MQTT协议与系统集成
+核心设备 | ESP32-S3-CAM开发板、OV2640摄像头、开发电脑
+版本日期 | 2026年7月13日 · V1.0
+A同学负责把OV2640图像稳定送到电脑端，并配合完成数据采集和YOLO验证；不要求在ESP32-S3-CAM上运行完整YOLOv8。视觉推理由电脑端完成，识别结果经MQTT交给B同学的经典ESP32执行提醒。
+事项 | A同学负责 | B同学申奥负责 | 共同确认
+硬件 | S3-CAM、OV2640、供电和排线 | 经典ESP32、ADS1115、底板模块 | 供电安全、设备编号
+MQTT | 订阅camera/cmd，上报camera/status | 制定主题、Schema、Broker和QoS | request_id与错误码
+HTTP | 发送JPEG、处理响应和重试 | 维护或协调图片接收服务 | 超时、重试、文件大小
+视觉 | 图像质量、数据采集和推理协作 | 消费vision/result并触发反馈 | 类别名、置信度、告警
+联调 | 提供摄像头日志和失败样图 | 提供模拟消息、系统日志和验收记录 | 端到端时延和稳定性
+参数 | 起步配置 | 调优方向 | 原因
+像素格式 | JPEG | 保持JPEG | 减少内存和网络负担
+分辨率 | VGA 640×480 | 先QVGA排错，再VGA | 兼顾器材细节和稳定性
+JPEG质量 | 15 | 在10～25范围测试 | 数值越小通常质量越高、文件越大
+帧缓存 | 1～2个 | 有PSRAM再使用2个 | 避免无PSRAM时内存不足
+白平衡 | 自动 | 固定场景可锁定 | 减少不同光照颜色漂移
+翻转/镜像 | 按安装方向 | 固定后写入配置 | 保证训练和部署方向一致
+项目 | 确认结果 | A同学实施要求
+模组 | ESP32-S3-WROOM-1-N8（原理图BOM） | Arduino选择ESP32S3 Dev Module；Flash Size先设8 MB
+摄像头 | OV2640，24针FPC | 断电插拔；锁扣压紧；先跑JPEG单拍
+下载/日志口 | 右侧TTL USB-C，经CH340C | 首选该口烧录和串口日志；BOOT失败时按住BOOT再复位
+原生USB口 | 左侧OTG USB-C，GPIO19/20 | 第一阶段不与摄像头上传任务混用，减少变量
+PSRAM | 未由N8 BOM确认 | 运行时检测；无PSRAM也能完成VGA JPEG拍照上传，但不要开高分辨率双缓冲
+供电 | USB 5 V输入，板上3.3/2.8/1.2 V稳压 | 连续拍照时使用稳定USB线；摄像头异常优先排查供电和排线
+功能 | 原理图网络 | ESP32-S3引脚 | 配置说明
+SCCB 数据 | CAM_SIOD / OV_SDA | GPIO4 | 摄像头配置中的 pin_sscb_sda
+SCCB 时钟 | CAM_SIOC / OV_SCL | GPIO5 | 摄像头配置中的 pin_sscb_scl
+场同步 | CAM_VSYNC | GPIO6 | OV2640 VSYNC
+行参考 | CAM_HREF | GPIO7 | OV2640 HREF
+像素时钟 | CAM_PCLK | GPIO13 | OV2640 PCLK
+主时钟 | CAM_XCLK | GPIO15 | 建议从 20 MHz 起步
+数据 D0 | CAM_Y2 | GPIO11 | camera_config.pin_d0
+数据 D1 | CAM_Y3 | GPIO9 | camera_config.pin_d1
+数据 D2 | CAM_Y4 | GPIO8 | camera_config.pin_d2
+数据 D3 | CAM_Y5 | GPIO10 | camera_config.pin_d3
+数据 D4 | CAM_Y6 | GPIO12 | camera_config.pin_d4
+数据 D5 | CAM_Y7 | GPIO18 | camera_config.pin_d5
+数据 D6 | CAM_Y8 | GPIO17 | camera_config.pin_d6
+数据 D7 | CAM_Y9 | GPIO16 | camera_config.pin_d7
+掉电 | OV_PWDN | 固定低电平 | 经 1 kΩ 下拉，不占 MCU GPIO；配置为 -1
+复位 | OV_RESET | 连接 EN | 随主控复位；配置为 -1
+板载资源 | 占用引脚 | 用途 | 分配规则
+TF 卡（1-bit） | GPIO40 / GPIO39 / GPIO38 | DATA0 / CLK / CMD | 启用 SD 时不要复用这三脚
+原生 USB OTG | GPIO19 / GPIO20 | D- / D+ | 左侧 OTG USB-C；USB 功能启用时不可复用
+USB 转串口 | GPIO43 / GPIO44 | U0TXD / U0RXD | 右侧 TTL USB-C，经 CH340C；建议用于烧录与日志
+板载 RGB | GPIO48 | WS2812 数据 | 可作状态灯，避免同时接其他高速负载
+BOOT | GPIO0 | 下载启动绑带脚 | 正常启动不要外部强拉低
+JTAG/绑带 | GPIO3、GPIO45、GPIO46 | 板级特殊用途 | 首版不分配给外设，这些脚会影响JTAG、启动或ROM输出
+可能的 PSRAM 资源脚 | GPIO35～GPIO37 | 不同模组版本有差异 | 本原理图 BOM 为 N8，首版一律保留不用
+场景 | 分辨率 | JPEG质量 | 帧缓冲 | 处理策略
+首次点亮 | QVGA 320×240 | 15 | 1 | 只保存一张图，确认方向、颜色与排线
+无PSRAM稳定版 | VGA 640×480 | 12～15 | 1 | 拍照后立即HTTP上传并归还帧缓冲
+检测到PSRAM | VGA或SVGA 800×600 | 10～14 | 2 | 可使用CAMERA_GRAB_LATEST，仍以稳定上传为先
+失败降级 | VGA→QVGA | 数值增大到15～20 | 1 | 依次降低分辨率、增大压缩、关闭双缓冲
+模块 | 职责 | 输入 | 输出/日志
+camera_driver | 初始化OV2640、取帧、归还帧缓存 | 分辨率、质量、引脚配置 | JPEG字节、错误码
+wifi_manager | 联网、重连、RSSI和状态机 | SSID、密码 | online、rssi
+mqtt_client | 接收拍照/配置命令，上报状态 | camera/cmd | camera/status
+http_uploader | 上传JPEG、重试和解析响应 | JPEG、request_id | image_id、HTTP状态
+device_status | 心跳、堆内存、运行时间和最后错误 | 系统状态 | 30秒状态消息
+config_store | 保存设备编号和画质参数 | 配置命令 | 重启后恢复
+BOOT → CAMERA_INIT → WIFI_CONNECT → MQTT_CONNECT → IDLE
+IDLE --capture--> CAPTURE → UPLOAD → REPORT → IDLE
+任一步失败 → ERROR_REPORT → BACKOFF → 对应重试状态
+主题/接口 | A同学动作 | 关键字段 | QoS/响应
+physlab/camera01/cmd | 订阅并执行拍照或配置 | schema, request_id, action, resolution, quality | QoS 1
+physlab/camera01/status | 发布心跳和错误 | online, rssi, uptime, heap, last_error | QoS 1
+POST /api/v1/images | 发送JPEG原始字节 | X-Device-Id, X-Request-Id | 201 + image_id
+physlab/vision/result | 通常由电脑发布；A仅用于日志核对 | request_id, objects, warning | QoS 1
+{
+  "schema": "physlab.camera.cmd.v1",
+  "request_id": "req-00017",
+  "action": "capture",
+  "resolution": "VGA",
+  "jpeg_quality": 15
+}
+{
+  "schema": "physlab.camera.status.v1",
+  "device_id": "camera01",
+  "online": true,
+  "rssi": -55,
+  "heap_free": 178320,
+  "psram_free": 7012352,
+  "last_request_id": "req-00017",
+  "last_error": null
+}
+数据类别 | 最低建议 | 变化维度 | 标注重点
+单器材图 | 每类50～100张起步 | 距离、角度、背景、光照 | 电阻、电容、电感、导线等类别
+正确接线图 | 每种场景不少于50张 | 不同学生、器材位置 | 完整器材与关键连接区域
+错误接线图 | 每类错误不少于30张 | 缺件、错接、遮挡 | 错误类型和可见证据
+负样本 | 不少于总量20% | 空桌、无关器材、手部遮挡 | 不应误报的场景
+测试集 | 独立保留约20% | 不得与训练帧重复 | 真实泛化表现
+阶段 | 时间建议 | A同学任务 | 交付物 | 验收
+A0 硬件确认 | 1～2天 | 型号、PSRAM、引脚、排线和供电 | 硬件清单、照片、引脚表 | 信息完整
+A1 摄像头自测 | 2～3天 | 官方例程、QVGA/VGA拍照 | 最小工程、样图 | 连续20次拍照
+A2 网络状态 | 2天 | Wi-Fi、MQTT心跳和重连 | 状态主题、日志 | 断网可恢复
+A3 图片上传 | 3～4天 | HTTP POST、超时和重试 | 上传模块、服务端记录 | 20次至少19次成功
+A4 命令闭环 | 2～3天 | MQTT触发拍照并回报image_id | 命令处理和错误码 | request_id一致
+A5 数据集 | 1～2周 | 采集、筛选、命名和标注协作 | 数据说明、样例、标注 | 完成首批核心类别
+A6 联调验收 | 3～5天 | 与B及电脑YOLO联调 | 演示视频、日志、问题表 | 端到端≤5秒建议值
+指标 | 最低值 | 测试方式 | 不通过时处理
+摄像头启动 | 连续10次成功 | 反复重启记录 | 核对引脚、供电和排线
+拍照成功率 | 20次至少19次 | 固定VGA参数 | 降低分辨率/检查内存
+JPEG完整性 | 电脑可正常解码 | 保存并批量打开 | 检查长度和帧缓存生命周期
+上传恢复 | 断网恢复后自动上线 | 关闭/恢复热点 | 增加状态机和退避
+命令追踪 | request_id全链路一致 | 对照MQTT和HTTP日志 | 统一字段和错误码
+端到端时延 | 局域网建议≤5秒 | 命令到vision/result时间戳 | 区分拍照、上传、推理耗时
+稳定运行 | 2小时无人工重启 | 心跳、heap和错误趋势 | 排查泄漏与阻塞
+故障 | 优先检查 | 证据 | 责任动作
+摄像头探测失败 | 引脚、排线方向、XCLK、供电 | 串口错误码 | 回退官方示例
+有时拍照崩溃 | PSRAM、分辨率、双帧缓存 | heap/psram日志 | 降低分辨率并单帧缓存
+图片花屏/截断 | 供电、排线、上传字节长度 | 本地保存样图 | 区分采集与网络故障
+上传超时 | 电脑IP、防火墙、Wi-Fi信号 | HTTP和服务端日志 | 局域网直连测试
+重复执行拍照 | MQTT QoS重投、无去重 | request_id重复 | 缓存最近请求ID
+YOLO识别差 | 光照、角度、图像尺寸、数据偏差 | 错误样例集 | 补数据而非盲目降阈值
+确认项 | A同学状态/日期 | B同学确认 | 备注
+S3-CAM型号和引脚已归档 |  |  | 
+摄像头最小工程可复现 |  |  | 
+MQTT主题和Schema V1冻结 |  |  | 
+图片上传接口V1冻结 |  |  | 
+首批数据集完成审核 |  |  | 
+端到端联调通过 |  |  | 

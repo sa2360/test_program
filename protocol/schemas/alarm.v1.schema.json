@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://physlab.local/schemas/alarm.v1.schema.json",
+  "title": "PhysLab alarm V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "request_id", "source", "code", "level", "message", "ts"],
+  "properties": {
+    "schema": {"const": "physlab.alarm.v1"},
+    "request_id": {"type": "string", "minLength": 1, "maxLength": 96},
+    "source": {"enum": ["sensor01", "camera01", "vision", "cloud"]},
+    "code": {"type": "string", "minLength": 1, "maxLength": 64},
+    "level": {"enum": ["info", "warning", "critical"]},
+    "message": {"type": "string", "minLength": 1, "maxLength": 300},
+    "ts": {"type": "integer", "minimum": 0}
+  }
+}

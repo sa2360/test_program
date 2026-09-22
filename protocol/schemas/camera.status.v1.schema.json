@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://physlab.local/schemas/camera.status.v1.schema.json",
+  "title": "PhysLab camera status V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "device_id", "request_id", "state", "image_id", "bytes", "http_status", "error"],
+  "properties": {
+    "schema": {"const": "physlab.camera.status.v1"},
+    "device_id": {"const": "camera01"},
+    "request_id": {"type": "string", "maxLength": 96},
+    "ts": {"type": "integer", "minimum": 0},
+    "state": {"enum": ["online", "capturing", "uploaded", "failed", "capture_failed", "upload_failed", "command_rejected", "duplicate_ignored"]},
+    "image_id": {"type": ["string", "null"], "maxLength": 96},
+    "bytes": {"type": "integer", "minimum": 0},
+    "http_status": {"type": "integer", "minimum": -1000, "maximum": 599},
+    "heap": {"type": "integer", "minimum": 0},
+    "psram": {"type": "integer", "minimum": 0},
+    "heap_bytes": {"type": "integer", "minimum": 0},
+    "error": {"type": ["string", "null"], "maxLength": 128}
+  },
+  "allOf": [{"if": {"properties": {"state": {"const": "uploaded"}}}, "then": {"properties": {"request_id": {"minLength": 1}, "image_id": {"type": "string", "minLength": 1}, "bytes": {"minimum": 1}, "http_status": {"const": 201}, "error": {"type": "null"}}}}]
+}
