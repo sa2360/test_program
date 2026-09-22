@@ -37,7 +37,7 @@ LLM_MODEL=agnes-2.0-flash
 依次启动 Broker 和云端：
 
 ```powershell
-.\.venv\Scripts\amqtt.exe -c .\broker.yaml
+.\.venv\Scripts\python.exe -m tools.run_broker
 .\.venv\Scripts\python.exe -u -m app.main
 ```
 

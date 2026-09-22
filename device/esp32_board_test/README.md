@@ -2,11 +2,11 @@
 
 本项目是 B 同学负责的传感节点固件。通过 Wi‑Fi 接入本地 MQTT Broker，实现模拟量采样、云端问答、视觉告警接收及状态上报。
 
-2026-09-17 已更新为双板联调固件，编译通过、尚未烧录。详细操作见 [COLLABORATION.md](../../COLLABORATION.md)。
+2026-09-23：0.5.0 已烧录并通过真实双板连续 10 次告警闭环。ADS1115、LED、蜂鸣器尚未接入；下一步按 [硬件接入与采样验收](HARDWARE_ACCEPTANCE.md) 操作。详细联调见 [COLLABORATION.md](../../COLLABORATION.md)。
 
 ## 固件能力
 
-- 设备编号固定为 `sensor01`，当前固件版本 `sensor01-fw-0.5.0`。
+- 设备编号固定为 `sensor01`，当前固件版本 `sensor01-fw-0.5.1`；新增 `/i2c` 离线诊断 GPIO21/22 上的 0x48–0x4B 地址。ACK 仅表示地址应答，不能确认芯片型号或校准状态。
 - Wi‑Fi 每 10 秒自动重连，MQTT 每 2 秒自动重试，主循环不会因断网长时间阻塞。
 - 每 30 秒向 `physlab/sensor01/status` 发布 retained 心跳，心跳中额外包含 `ads_initialized` 字段。
 - 串口输入问题后向 `physlab/assistant/question` 发布 V1 JSON。

@@ -9,13 +9,14 @@ from pathlib import Path
 import threading
 import uuid
 
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import FastAPI, HTTPException, Request, Query
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from jsonschema import ValidationError
 import paho.mqtt.client as mqtt
 
 from app.config import Settings
+from app.annotations import AnnotationStore, LABELS
 from app.experiments import all_experiments
 from app.image_store import ImageStore, MAX_IMAGE_BYTES, UploadError
 from app.lab_store import LabError, LabStore
@@ -115,6 +116,7 @@ def create_app(data_dir: Path | None = None, mqtt_enabled: bool = True,
         settings = settings_override or Settings.from_env()
         root = data_dir or Path(os.getenv("IMAGE_DATA_DIR", str(Path(__file__).resolve().parents[1] / "data" / "images")))
         app.state.store = ImageStore(root)
+        app.state.annotations = AnnotationStore(app.state.store)
         app.state.lab = LabStore(root)
         app.state.answers = LlmAnswerService(settings)
         app.state.bridge = MqttBridge(app.state.store, settings) if mqtt_enabled else None
@@ -154,6 +156,28 @@ def create_app(data_dir: Path | None = None, mqtt_enabled: bool = True,
         bridge = app.state.bridge
         return {"status": "ok", "mqtt_connected": bool(bridge and bridge.client.is_connected()),
                 "pending_messages": app.state.store.pending_count(), "vision_backend": "unconfigured"}
+
+    @app.get("/annotate", include_in_schema=False)
+    def annotation_page():
+        return FileResponse(STATIC_DIR / "annotate.html", media_type="text/html")
+
+    @app.get("/api/v1/label-images")
+    def label_images(before: int = Query(0, ge=0), limit: int = Query(30, ge=1, le=100)):
+        return {"labels": LABELS, "images": app.state.annotations.listing(before, limit)}
+
+    @app.get("/api/v1/annotations/export")
+    def export_annotations():
+        return Response(app.state.annotations.export(), media_type="application/zip",
+                        headers={"Content-Disposition": 'attachment; filename="physlab-annotations.zip"'})
+
+    @app.get("/api/v1/annotations/{image_id}")
+    def annotation(image_id: str):
+        return app.state.annotations.get(image_id)
+
+    @app.put("/api/v1/annotations/{image_id}")
+    async def save_annotation(image_id: str, request: Request):
+        payload = await json_body(request, 65536)
+        return await asyncio.to_thread(app.state.annotations.save, image_id, payload)
 
     @app.post("/api/v1/images", status_code=201)
     async def upload(request: Request):

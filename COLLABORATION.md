@@ -1,5 +1,7 @@
 # A/B 双人开发与联合调试
 
+2026-09-23 补充：真实 A/B 连续 10 次闭环已通过，最新证据和限制以根目录 README 与 STATUS 顶部为准。A 可维护工程为 device/physlab-camera-node；相机参数仍固定 VGA/quality=15。启动 Broker 使用 tools.run_broker 的 Windows 独占绑定，避免重复实例。下文 09-17 的未烧录/网络状态为历史记录。
+
 更新：2026-09-17。本文件针对当前文件夹中的真实代码，而非最终项目设想。
 
 ## 1. 现在到哪一步
@@ -51,7 +53,7 @@ A 的后续源码建议放独立目录，不覆盖 `device/esp32_board_test`。�
 终端一：MQTT 中转服务。
 
 ```powershell
-.\.venv\Scripts\amqtt.exe -c broker.yaml
+.\.venv\Scripts\python.exe -m tools.run_broker
 ```
 
 终端二：兼容 A Day08 的图片服务。

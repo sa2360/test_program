@@ -11,7 +11,7 @@
 namespace
 {
 constexpr char DEVICE_ID[] = "sensor01";
-constexpr char FIRMWARE_VERSION[] = "sensor01-fw-0.5.0";
+constexpr char FIRMWARE_VERSION[] = "sensor01-fw-0.5.1";
 constexpr char ASSISTANT_QUESTION_TOPIC[] = "physlab/assistant/question";
 constexpr char ASSISTANT_ANSWER_TOPIC[] = "physlab/assistant/answer";
 constexpr char SENSOR_STATUS_TOPIC[] = "physlab/sensor01/status";
@@ -557,7 +557,22 @@ void handleSerialInput()
             serialInput.trim();
             if (serialInput.length() > 0)
             {
-                if (mqttClient.connected())
+                if (serialInput == "/i2c")
+                {
+                    if (samplePending) Serial.println("Sampling in progress; retry /i2c shortly.");
+                    else
+                    {
+                        Serial.printf("ADS address probe: SDA=%d SCL=%d configured=0x%02X\n", ADS_SDA, ADS_SCL, ADS_ADDR);
+                        for (uint8_t address = 0x48; address <= 0x4B; ++address)
+                        {
+                            Wire.beginTransmission(address);
+                            const uint8_t error = Wire.endTransmission();
+                            Serial.printf("I2C 0x%02X: %s (code=%u)\n", address, error == 0 ? "ACK" : "NO_ACK", error);
+                        }
+                        Serial.println("ACK confirms an I2C response only, not the chip model or calibration.");
+                    }
+                }
+                else if (mqttClient.connected())
                 {
                     if (serialInput == "/capture") publishCapture();
                     else if (serialInput == "/sample") performSampling();

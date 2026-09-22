@@ -8,7 +8,7 @@ import tempfile
 import threading
 import uuid
 
-from amqtt.broker import Broker
+from tools.run_broker import ExclusiveBroker as Broker
 import httpx
 import paho.mqtt.client as mqtt
 import uvicorn

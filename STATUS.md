@@ -1,5 +1,26 @@
 # A/B 共同开发状态
 
+## 最新验收（2026-09-23）
+
+- **最新接线复查（优先于以下历史在线结论）**：用户表示已接线；零输入采样请求超时。串口启动显示 ADS1115 初始化失败、MQTT 重连失败。B 编译烧录诊断版 0.5.1，增加不依赖网络的 `/i2c`；实测 SDA21/SCL22 的 0x48、0x49、0x4A、0x4B 全部 NO_ACK/code=2。已保存 `cloud/data/acceptance/i2c-20260923.log` 和失败采样报告 `sensor-zero-20260923.json`。尚未采到有效 ADC 数据，需实物接线/模块供电核对。
+
+- 下一阶段准备：用户确认 ADS1115、LED、蜂鸣器未接；新增 `tools.check_sensor`，按 request_id 接收 A0 原始数据/失败告警，支持连续采样与可选参考电压误差检查，保存 JSON 证据。真实 B 返回 `sensor_read_error: ADS1115 is not connected.`，错误链路确认正常；不计作采样成功。接线及校准准备见 `device/esp32_board_test/HARDWARE_ACCEPTANCE.md`。
+
+- 已重新核对其他任务新增的学生/教师页面、数据表、知识库和运行状态，保留这些成果；原始交接快照和 Word/PDF 未修改。
+- 电脑及两板恢复到 `sa` 热点，电脑 IPv4 `192.168.43.86`。A 为 COM6，B 为 COM5；B 保留已烧录的 0.5.0，当前心跳 online=true、clock_synced=true、ads_initialized=false。
+- **真实双板连续 10 次闭环通过**：A JPEG 上传、A `uploaded` 状态、视觉 unknown 回传、B `vision_unknown` 告警按同一 request_id 关联；三种实验归属均正确。证据：`cloud/data/acceptance/joint-20260923.json`（scope=camera_and_sensor、passed=true）。耗时 0.625–1.062 秒/次。此前仅 A 板的 10 次记录保留于 `camera-10.json`，未把早先失败覆盖成成功。
+- 修复 A 的 MQTT 重连阻塞 Wi-Fi 恢复；启用原生 USB CDC 日志；MQTT 缓冲区设为 1024 字节，以容纳 UUID 请求编号的状态消息。A 编译、烧录及校验成功。
+- 修复网页拍照的实验归属、切换学生的数据表残留/异步覆盖，以及本地知识无关命中和连续中文检索；待审核本地回答明确标记。
+- 修复 Windows 多 Broker 同端口问题：使用 `python -m tools.run_broker` 独占绑定，旧 `amqtt.exe` 直接启动方式不再推荐。已清理上次重复实例。
+- **40 项自动测试通过**（新增采样工具 4 项）；此前六阶段 MQTT/HTTP 集成自检通过，网页实际验证学生切换和原有表恢复。
+- 验收结束时 `/health`：mqtt_connected=true、pending_messages=0。后台 Broker 与 HTTP 服务保留运行。
+
+仍未完成：真实视觉模型、实验场景拍摄/标注、ADS1115 校准、执行器引脚确认、账号权限隔离及物理专业知识复核。照片当前为电脑附近画面，不代表电路识别验收。Agnes 本轮未在线验收。`.git` 不完整，未提交/推送。
+
+---
+
+## 前次记录（保留历史，以下不是当前结论）
+
 更新时间：2026-09-22
 
 ## 本轮检查与完成（真实 B 板上线）

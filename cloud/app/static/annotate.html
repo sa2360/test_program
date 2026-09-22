@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PhysLab 图片采集与人工标注</title><link rel="stylesheet" href="/assets/styles.css">
+<style>.annotation-layout{display:grid;grid-template-columns:260px 1fr;gap:20px}.image-picker{max-height:620px;overflow:auto}.image-picker button{display:block;width:100%;text-align:left;margin:4px 0}.canvas-wrap{overflow:auto}canvas{display:block;width:100%;max-width:960px;height:auto;touch-action:none;background:#172b36;border:1px solid #557080}#boxes li{margin:8px 0} @media(max-width:750px){.annotation-layout{grid-template-columns:1fr}.image-picker{max-height:180px}}</style></head>
+<body><header><h1>图片采集与人工标注</h1><p>拍摄真实实验场景，逐张确认图片质量并框选器材。</p>
+<nav><a href="/student">学生端</a> · <a href="/teacher">教师端</a></nav></header>
+<main><section class="panel">
+<h2>采集图片</h2><p>先固定相机并对准实验台。每次改变器材位置、角度或光照后，再拍下一张。</p>
+<label for="experiment">本次实验</label><select id="experiment"></select>
+<button id="capture" type="button">拍摄一张</button><button id="refresh" type="button">刷新图片</button>
+<p id="capture-status" role="status"></p></section>
+<section class="panel"><h2>人工标注</h2><p>框选只标记可见器材，不表示接线正确。草稿与排除图片不会导出；标注不会触发设备告警。</p>
+<div class="annotation-layout"><aside><div id="image-list" class="image-picker"></div><button id="more" type="button">加载更早图片</button></aside>
+<div><p id="selected-image">请选择图片。</p><div class="canvas-wrap"><canvas id="canvas" width="640" height="480" aria-label="器材框选画布"></canvas></div>
+<p>选择器材类别后，在图上按住并拖出矩形。也可用下方数字输入框添加，坐标单位为原图像素。</p>
+<label for="label">器材类别</label><select id="label"></select>
+<div class="inline"><div><label for="box-x">左上 X</label><input id="box-x" type="number" min="0" value="0"></div><div><label for="box-y">左上 Y</label><input id="box-y" type="number" min="0" value="0"></div><div><label for="box-w">宽度</label><input id="box-w" type="number" min="1" value="50"></div><div><label for="box-h">高度</label><input id="box-h" type="number" min="1" value="50"></div></div>
+<button id="add-box" type="button">添加框</button><ol id="boxes"></ol>
+<label for="reviewer">标注人</label><input id="reviewer" maxlength="60" placeholder="姓名或编号">
+<label for="group">同一布置编号</label><input id="group" maxlength="80" placeholder="例如 rlc-table1-setup01">
+<p class="muted">同一次接线布置的连续照片使用相同编号；以后分训练集与测试集时整组划分。</p>
+<label for="quality">图片质量</label><select id="quality"><option value="usable">清晰可用</option><option value="blurred">模糊</option><option value="occluded">关键区域遮挡</option><option value="not_experiment">非实验画面</option></select>
+<label for="status">标注状态</label><select id="status"><option value="draft">草稿</option><option value="ready">已人工确认，可导出</option><option value="excluded">排除</option></select>
+<label><input id="negative" type="checkbox">我确认图片中没有任何上述目标类别（负样本）</label>
+<label for="notes">备注</label><textarea id="notes" maxlength="1000" placeholder="拍摄条件、难辨认器材或排除原因"></textarea>
+<button id="save" type="button" disabled>保存标注</button><p id="save-status" role="status"></p></div></div></section>
+<section class="panel"><h2>导出数据</h2><p>导出已人工确认的原图和 JSON 标注。历史联调图不会自动成为训练样本。</p><button id="export" type="button">导出已确认标注 ZIP</button><p id="export-status" role="status"></p></section>
+</main><script src="/assets/annotate.js" defer></script></body></html>
